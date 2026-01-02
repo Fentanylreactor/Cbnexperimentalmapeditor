@@ -802,122 +802,91 @@ let brushHistory = [];
         }
 
         function renderPalette() {
-            paletteContainer.innerHTML = '';
-            activeBrushes.clear(); 
-            const usedSymbols = new Set(mapGrid.flat());
-            const allBrushes = { ...MASTER_TILE_DEFINITIONS, ...tileDefinitions };
-            const symbolsToShow = new Set([DEFAULT_TILE, ...Object.keys(tileDefinitions), ...usedSymbols]);
+    paletteContainer.innerHTML = '';
+    activeBrushes.clear(); 
+    const usedSymbols = new Set(mapGrid.flat());
+    const allBrushes = { ...MASTER_TILE_DEFINITIONS, ...tileDefinitions };
+    const symbolsToShow = new Set([DEFAULT_TILE, ...Object.keys(tileDefinitions), ...usedSymbols]);
+    
+    const sortedSymbols = [...symbolsToShow].filter(s => s !== 'UNKNOWN').sort((a, b) => {
+        const indexA = brushHistory.indexOf(a);
+        const indexB = brushHistory.indexOf(b);
+        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
+        if (a === DEFAULT_TILE) return -1;
+        if (b === DEFAULT_TILE) return 1;
+        return a.localeCompare(b);
+    });
+
+    sortedSymbols.forEach(symbol => {
+        const def = allBrushes[symbol] || tileDefinitions[symbol];
+        if (def && def.definition && def.definition !== 'unknown') {
+            activeBrushes.add(symbol);
+            const item = document.createElement('div');
             
-            const sortedSymbols = [...symbolsToShow].filter(s => s !== 'UNKNOWN').sort((a, b) => {
-                const indexA = brushHistory.indexOf(a);
-                const indexB = brushHistory.indexOf(b);
-                if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-                if (indexA !== -1) return -1;
-                if (indexB !== -1) return 1;
-                if (a === DEFAULT_TILE) return -1;
-                if (b === DEFAULT_TILE) return 1;
-                return a.localeCompare(b);
-            });
+            // Generate a unique ID for the canvas so we can target it
+            const canvasId = `sprite-canvas-${symbol.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            
+            item.id = `palette-${symbol.replace(/[^a-zA-Z0-9]/g, '_')}`; 
+            item.className = 'palette-item rounded-md text-sm font-bold shadow-md select-none flex flex-col items-center justify-center p-1'; 
+            item.dataset.tileKey = symbol;
+            item.title = `${def.name} (${def.definition})\nHold to change color`;
+            
+            // Keep the background color as a fallback in case sprite fails
+            item.style.backgroundColor = def.color;
+            item.style.color = def.text;
+            item.style.minHeight = "60px";
 
-            sortedSymbols.forEach(symbol => {
-                const def = allBrushes[symbol] || tileDefinitions[symbol];
-                if (def && def.definition && def.definition !== 'unknown') {
-                    activeBrushes.add(symbol);
-                    const item = document.createElement('div');
-                    item.id = `palette-${symbol.replace(/[^a-zA-Z0-9]/g, '_')}`; 
-                    item.className = 'palette-item rounded-md text-sm font-bold shadow-md select-none'; // Added select-none
-                    item.dataset.tileKey = symbol;
-                    item.title = `${def.name} (${def.definition})\nHold to change color`; // Updated Tooltip
-                    item.style.backgroundColor = def.color;
-                    item.style.color = def.text;
-                    // Inside renderPalette sortedSymbols.forEach loop:
+            item.innerHTML = `
+                <div class="relative flex flex-col items-center pointer-events-none w-full">
+                    <canvas id="${canvasId}" width="32" height="32" 
+                            style="width: 32px; height: 32px; image-rendering: pixelated;"></canvas>
+                    
+                    <span class="absolute top-0 right-0 font-mono text-[10px] opacity-50">${symbol}</span>
+                    
+                    <span class="text-center font-bold pointer-events-none mt-1" 
+                          style="font-size: 10px; line-height: 0.9; max-width: 100%; word-break: break-all; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; opacity: 0.9;">
+                        ${def.definition}
+                    </span>
+                </div>
+            `;
 
-// Locate this inside the sortedSymbols.forEach loop in renderPalette()
-item.innerHTML = `
-    <span class="font-mono text-center text-xl pointer-events-none leading-none" 
-          style="margin-bottom: 2px;">
-        ${symbol}
-    </span>
-    <span class="text-center font-bold pointer-events-none" 
-          style="font-size: 12px; /* Increased from 7px */
-                 line-height: 0.9; 
-                 max-width: 100%; 
-                 word-break: break-all; 
-                 display: -webkit-box;
-                 -webkit-line-clamp: 2; /* Allows 2 lines if name is very long */
-                 -webkit-box-orient: vertical;
-                 overflow: hidden;
-                 opacity: 0.9;">
-        ${def.definition}
-    </span>
-`;
-                    if (symbol === selectedTile) item.classList.add('selected');
+            if (symbol === selectedTile) item.classList.add('selected');
 
-                    // --- NEW LONG PRESS LOGIC START ---
-                    const startPress = (e) => {
-                        // Prevent default context menu on right click, but allow left click
-                        if (e.type === 'mousedown' && e.button !== 0) return;
-                        
-                        longPressTimer = setTimeout(() => {
-                            brushColorTargetSymbol = symbol;
-                            brushColorPicker.value = def.color; // Set picker to current color
-                            brushColorPicker.click(); // Open system picker
-                            if(navigator.vibrate) navigator.vibrate(50); // Haptic feedback
-                        }, LONG_PRESS_DURATION);
-                    };
+            // --- SPRITE DRAWING LOGIC ---
+            // If the engine is ready, try to draw. Use 'def.definition' because 
+            // in CDDA, 't_dirt' is the ID, while 'symbol' is often just "."
+            if (window.drawCDDASprite) {
+                // Try to draw using the definition (e.g., t_dirt, f_sofa)
+                window.drawCDDASprite(canvasId, def.definition);
+            }
 
-                    const cancelPress = () => {
-                        if (longPressTimer) {
-                            clearTimeout(longPressTimer);
-                            longPressTimer = null;
-                        }
-                    };
+            // --- LONG PRESS LOGIC (Preserved) ---
+            const startPress = (e) => {
+                if (e.type === 'mousedown' && e.button !== 0) return;
+                longPressTimer = setTimeout(() => {
+                    brushColorTargetSymbol = symbol;
+                    brushColorPicker.value = def.color;
+                    brushColorPicker.click();
+                    if(navigator.vibrate) navigator.vibrate(50);
+                }, LONG_PRESS_DURATION);
+            };
 
-                    // Desktop Events
-                    item.addEventListener('mousedown', startPress);
-                    item.addEventListener('mouseup', cancelPress);
-                    item.addEventListener('mouseleave', cancelPress);
+            const cancelPress = () => {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+            };
 
-                    // Mobile Events
-                    item.addEventListener('touchstart', (e) => { startPress(e); }, {passive: true});
-                    item.addEventListener('touchend', cancelPress);
-                    item.addEventListener('touchmove', cancelPress); // Cancel if they scroll while holding
-                    // --- NEW LONG PRESS LOGIC END ---
+            item.addEventListener('mousedown', startPress);
+            item.addEventListener('mouseup', cancelPress);
+            item.addEventListener('mouseleave', cancelPress);
+            item.addEventListener('touchstart', (e) => { startPress(e); }, {passive: true});
+            item.addEventListener('touchend', cancelPress);
+            item.addEventListener('touchmove', cancelPress);
 
-                    paletteContainer.appendChild(item);
-                }
-            });
+            paletteContainer.appendChild(item);
         }
-        
-        function selectTile(symbol, element) {
-    // 1. Standard selection logic
-    const previousSelected = document.querySelector('.palette-item.selected');
-    if (previousSelected) previousSelected.classList.remove('selected');
-    
-    selectedTile = symbol;
-    
-    // 2. Update the Global History (MRU Stack)
-    // Remove the symbol if it's already in the list, then add it to the front
-    brushHistory = brushHistory.filter(s => s !== symbol);
-    brushHistory.unshift(symbol);
-
-    // 3. Update Visuals
-    // If we clicked an element, highlight it. 
-    // We do NOT need to manually move the DOM element here (insertBefore), 
-    // because we will let renderPalette handles the sorting based on history.
-    if (element) {
-        element.classList.add('selected');
-    } else {
-        // If no element passed (e.g. initial load), find it and highlight
-        const el = document.getElementById(`palette-${symbol.replace(/[^a-zA-Z0-9]/g, '_')}`);
-        if(el) el.classList.add('selected');
-    }
-    
-    updateStatus(`Selected brush: ${tileDefinitions[selectedTile]?.name || selectedTile}`, 'text-blue-300');
-    clearBrushPreview(); 
-    
-    // 4. Re-render the palette immediately to reflect the new sort order
-    renderPalette();
+    });
 }
 
         function handleAddBrush() {
