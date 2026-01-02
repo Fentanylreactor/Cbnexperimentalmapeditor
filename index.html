@@ -2198,28 +2198,44 @@ item.innerHTML = `
 
     async function startEngine() {
         console.log("Initializing Sprite Engine...");
+
+        // LIST ALL YOUR JSON FILES HERE
+        const filesToLoad = [
+            'tile_config.json', // Always include the main one first if you have it
+            'External_Tileset_DP_terrain_normal.json',
+            'External_Tileset_DP_eyes.json',
+            'External_Tileset_DP_Tall.json',
+            'AFS_external.json'
+        ];
+
+        // This will load all of them and combine them
+        const drawFunction = await initSpriteSystem(filesToLoad);
         
-        // Load the system
-        const drawFunction = await initSpriteSystem('tile_config.json');
-        
-        // CRITICAL STEP: Attach it to 'window' so your other scripts can see it
+        // Attach to window
         window.drawCDDASprite = drawFunction;
 
-        console.log("Sprite Engine Ready! You can now call window.drawCDDASprite('canvasId', 'itemId')");
-
-        // Test it immediately to make sure it works
-        // (Optional: creates a test canvas at the bottom of the page)
+        // TEST: Try to draw dirt instead of aspirin
         const testCanvas = document.createElement('canvas');
         testCanvas.id = 'debug-sprite-test';
+        testCanvas.style.border = '1px solid red'; // Make it visible
+        testCanvas.style.backgroundColor = '#333';
         document.body.appendChild(testCanvas);
-        window.drawCDDASprite('debug-sprite-test', 'aspirin');
+        
+        // Try drawing 't_dirt' (common terrain)
+        const success = window.drawCDDASprite('debug-sprite-test', 't_dirt');
+        
+        if (!success) {
+            console.log("Test draw failed. Check Console (F12) for 404 errors.");
+        } else {
+            console.log("Test draw success! t_dirt rendered.");
+        }
     }
 
     startEngine();
 </script>
 
 
-
 </body>
 
 </html>
+
