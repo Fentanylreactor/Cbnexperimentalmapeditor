@@ -164,17 +164,7 @@
         padding-bottom: 10px;
         }
 
-        /* Update these lines in your CSS (around line 125 and 153) */
-.palette-item {
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    border: 2px solid transparent;
-    display: flex; 
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    line-height: 1.1;
-
+        
     /* SIZING FIX: Use min-width/height so they don't shrink */
     min-width: 64px; 
     min-height: 64px; 
@@ -2174,129 +2164,114 @@ let brushHistory = [];
     const logEl = document.getElementById('sprite-debug-log');
     const log = (msg) => { logEl.innerHTML += `> ${msg}<br>`; console.log(msg); };
 
-    window.initSpriteSystem = async function(jsonPaths) {
-        const paths = Array.isArray(jsonPaths) ? jsonPaths : [jsonPaths];
-        const imageMap = new Map();
-        const idMap = new Map();
-        let pixelscale = 1;
-        let globalW = 32, globalH = 32;
+    // --- REPLACE EVERYTHING FROM HERE TO THE END ---
+window.initSpriteSystem = async function(jsonPaths) {
+    const paths = Array.isArray(jsonPaths) ? jsonPaths : [jsonPaths];
+    const imageMap = new Map();
+    const idMap = new Map();
+    let pixelscale = 1, globalW = 32, globalH = 32;
 
-        for (const path of paths) {
-            try {
-                const res = await fetch(path);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const cfg = await res.json();
-                log(`Loaded ${path}`);
-
-                // Handle tile_info (found in main config)
-                if (cfg.tile_info && cfg.tile_info[0]) {
-                    pixelscale = cfg.tile_info[0].pixelscale || pixelscale;
-                    globalW = cfg.tile_info[0].width || globalW;
-                    globalH = cfg.tile_info[0].height || globalH;
-                }
-
-                // In external files, "tiles-new" is the key
-                const chunks = cfg["tiles-new"] || [];
-                for (const chunk of chunks) {
+    for (const path of paths) {
+        try {
+            const res = await fetch(path);
+            const cfg = await res.json();
+            if (cfg.tile_info && cfg.tile_info[0]) {
+                pixelscale = cfg.tile_info[0].pixelscale || pixelscale;
+                globalW = cfg.tile_info[0].width || globalW;
+                globalH = cfg.tile_info[0].height || globalH;
+            }
+            if (cfg["tiles-new"]) {
+                cfg["tiles-new"].forEach(chunk => {
                     if (!imageMap.has(chunk.file)) {
                         const img = new Image();
                         img.src = chunk.file;
-                        await new Promise(r => { img.onload = r; img.onerror = r; });
                         imageMap.set(chunk.file, img);
                     }
-
                     const img = imageMap.get(chunk.file);
                     const sW = chunk.sprite_width || globalW;
                     const sH = chunk.sprite_height || globalH;
-                    const nx = Math.floor(img.width / sW);
-
-                    chunk.tiles.forEach(tileEntry => {
-                        // Support for standard IDs or aliases
-                        const ids = [tileEntry.id].flat(); 
+                    
+                    chunk.tiles.forEach(t => {
+                        const ids = [t.id].flat();
                         ids.forEach(id => {
-                            if (!id) return;
-                            idMap.set(id, {
-                                fg: formatLayer(tileEntry.fg, chunk, nx, sW, sH),
-                                bg: formatLayer(tileEntry.bg, chunk, nx, sW, sH),
-                                w: sW, h: sH
+                            idMap.set(id, { 
+                                fg: t.fg, 
+                                bg: t.bg, 
+                                w: sW, 
+                                h: sH, 
+                                file: chunk.file,
+                                // Dynamically calculate how many sprites per row for THIS chunk
+                                // This is crucial for different sized sprite sheets
+                                nx: 0 // Will be set on first draw when image loads
                             });
                         });
                     });
-                }
-            } catch (e) {
-                log(`<span style="color:red">Error loading ${path}: ${e.message}</span>`);
+                });
             }
-        }
+        } catch (e) { console.error("Load fail:", path); }
+    }
 
-        function formatLayer(layer, chunk, nx, w, h) {
-            if (!layer && layer !== 0) return null;
-            // Handle if layer is { "sprite": 10 } or just 10
-            const spriteId = (typeof layer === 'object') ? (layer.sprite ?? (Array.isArray(layer) ? layer[0] : null)) : layer;
-            if (spriteId === null) return null;
-            
-            return {
-                file: chunk.file,
-                tx: spriteId % nx,
-                ty: Math.floor(spriteId / nx),
-                width: w, height: h,
-                offx: chunk.sprite_offset_x || 0,
-                offy: chunk.sprite_offset_y || 0
-            };
-        }
-
-        statusEl.innerText = `Ready (${idMap.size} IDs)`;
+    return function(canvasId, spriteId) {
+        const data = idMap.get(spriteId);
+        const canvas = document.getElementById(canvasId);
+        if (!data || !canvas) return false;
         
-        return function(canvasId, spriteId) {
-            const data = idMap.get(spriteId);
-            const canvas = document.getElementById(canvasId);
-            if (!canvas) return false;
-            if (!data) {
-                // Draw a simple placeholder if ID missing
-                const ctx = canvas.getContext('2d');
-                ctx.fillStyle = "purple"; ctx.fillRect(0,0,32,32);
-                return false;
-            }
-            
-            const ctx = canvas.getContext('2d');
-            canvas.width = data.w * pixelscale;
-            canvas.height = data.h * pixelscale;
-            ctx.imageSmoothingEnabled = false;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const img = imageMap.get(data.file);
+        if (!img || !img.complete) return false;
 
-            [data.bg, data.fg].forEach(layer => {
-                if (!layer) return;
-                const img = imageMap.get(layer.file);
-                if (!img) return;
-                ctx.drawImage(img, layer.tx * layer.width, layer.ty * layer.height, layer.width, layer.height, layer.offx * pixelscale, layer.offy * pixelscale, layer.width * pixelscale, layer.height * pixelscale);
-            });
-            return true;
+        // Set the horizontal count if not set
+        if (data.nx === 0) data.nx = Math.floor(img.width / data.w);
+
+        const ctx = canvas.getContext('2d');
+        canvas.width = data.w * pixelscale;
+        canvas.height = data.h * pixelscale;
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const drawLayer = (layer) => {
+            if (!layer && layer !== 0) return;
+            const sId = (typeof layer === 'object') ? layer.sprite : layer;
+            // Skip random sprite arrays for now
+            if (Array.isArray(sId)) return; 
+
+            ctx.drawImage(
+                img,
+                (sId % data.nx) * data.w, Math.floor(sId / data.nx) * data.h, // Source
+                data.w, data.h,                                              // Source size
+                0, 0,                                                        // Dest
+                data.w * pixelscale, data.h * pixelscale                      // Dest size
+            );
         };
+
+        drawLayer(data.bg);
+        drawLayer(data.fg);
+        return true;
     };
+};
 
-    // Start immediately with ONLY tile_config.json
-    (async function() {
-        try {
-            const statusEl = document.getElementById('sprite-status');
-            if(statusEl) statusEl.innerText = "Connecting to tile_config...";
+// 2. Start the Engine immediately
+(async function() {
+    try {
+        const statusEl = document.getElementById('sprite-status');
+        if(statusEl) statusEl.innerText = "Connecting to tile_config...";
 
-            // Use only the main file for now
-            const myFiles = ['tile_config.json'];
-            
-            window.drawCDDASprite = await window.initSpriteSystem(myFiles);
-            
-            if (window.drawCDDASprite) {
-                // Try to draw t_dirt to the floating box
-                const drawSuccess = window.drawCDDASprite('debug-sprite-test', 't_dirt');
-                if(!drawSuccess) console.warn("t_dirt not found in config");
-            }
-            
-            if (typeof renderPalette === 'function') {
-                renderPalette(); 
-            }
-        } catch (globalError) {
-            alert("Critical Script Error: " + globalError.message);
+        window.drawCDDASprite = await window.initSpriteSystem(['tile_config.json']);
+        
+        if (window.drawCDDASprite) {
+            console.log("Sprite Engine Ready");
+            // Draw test sprite
+            window.drawCDDASprite('debug-sprite-test', 't_dirt');
         }
-    })();
+        
+        // Refresh palette to show icons
+        if (typeof renderPalette === 'function') {
+            renderPalette(); 
+        }
+    } catch (e) {
+        console.error("Engine start failed:", e);
+    }
+})();
+
 </script>
 </body>
 </html>
