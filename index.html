@@ -2287,6 +2287,11 @@ let brushHistory = [];
         if (!window.drawCDDASprite('debug-sprite-test', 't_dirt')) {
             window.drawCDDASprite('debug-sprite-test', 't_grass');
         }
+       
+       // REFRESH THE PALETTE ONCE LOADED
+    if (typeof renderPalette === 'function') {
+        renderPalette(); 
+    }
     })();
 })();
 </script>
