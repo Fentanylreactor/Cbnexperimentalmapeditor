@@ -2273,31 +2273,28 @@ let brushHistory = [];
         };
     };
 
-    // Start immediately
+    // Start immediately with ONLY tile_config.json
     (async function() {
-        const myFiles = [
-            'tile_config.json',
-            'External_Tileset_DP_terrain_normal.json',
-            'External_Tileset_DP_eyes.json',
-            'External_Tileset_DP_Tall.json',
-            'AFS_external.json'
-        ];
-        
-        console.log("Starting Engine...");
-        window.drawCDDASprite = await window.initSpriteSystem(myFiles);
-        
-        // Attempt to draw a basic dirt tile to the floating test canvas
-        if (window.drawCDDASprite) {
-            const success = window.drawCDDASprite('debug-sprite-test', 't_dirt');
-            if(!success) {
-                window.drawCDDASprite('debug-sprite-test', 't_grass');
+        try {
+            const statusEl = document.getElementById('sprite-status');
+            if(statusEl) statusEl.innerText = "Connecting to tile_config...";
+
+            // Use only the main file for now
+            const myFiles = ['tile_config.json'];
+            
+            window.drawCDDASprite = await window.initSpriteSystem(myFiles);
+            
+            if (window.drawCDDASprite) {
+                // Try to draw t_dirt to the floating box
+                const drawSuccess = window.drawCDDASprite('debug-sprite-test', 't_dirt');
+                if(!drawSuccess) console.warn("t_dirt not found in config");
             }
-        }
-        
-        // REFRESH THE PALETTE ONCE LOADED
-        if (typeof renderPalette === 'function') {
-            console.log("Refreshing Palette with sprites...");
-            renderPalette(); 
+            
+            if (typeof renderPalette === 'function') {
+                renderPalette(); 
+            }
+        } catch (globalError) {
+            alert("Critical Script Error: " + globalError.message);
         }
     })();
 </script>
