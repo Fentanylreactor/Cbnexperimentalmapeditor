@@ -2193,10 +2193,10 @@ item.innerHTML = `
    
    <canvas id="spriteHelper" style="display:none;"></canvas>
 
-<div style="padding: 10px; background: #111; border-top: 2px solid #444; color: white; font-family: monospace; font-size: 12px;">
-    <div>Status: <span id="sprite-status">Initializing...</span></div>
-    <div id="sprite-debug-log"></div>
-    <canvas id="debug-sprite-test" style="border: 1px solid #00ff00; margin-top: 5px;"></canvas>
+<div id="sprite-debug-pane" style="position: fixed; top: 10px; left: 10px; z-index: 9999; background: rgba(0,0,0,0.8); border: 1px solid #00ff00; padding: 10px; pointer-events: none; max-width: 200px;">
+    <div style="font-size: 10px; color: #00ff00;">Engine: <span id="sprite-status">Init...</span></div>
+    <canvas id="debug-sprite-test" style="width: 32px; height: 32px; border: 1px solid #555; display: block; margin-top: 5px;"></canvas>
+    <div id="sprite-debug-log" style="font-size: 9px; color: #aaa; max-height: 50px; overflow: hidden;"></div>
 </div>
 
 <script>
@@ -2326,5 +2326,6 @@ item.innerHTML = `
 </body>
 
 </html>
+
 
 
