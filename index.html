@@ -107,25 +107,25 @@
         }
 
         .palette-item {
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            border: 2px solid transparent;
-            display: flex; 
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
-            
-            /* --- TEXT VISIBILITY UPGRADE --- */
-            color: white !important; /* Force white text */
-            font-weight: 900; /* Extra bold for small text legibility */
-            
-            /* "Stroke" effect using 4 hard shadows */
-            text-shadow: 
-                -1px -1px 1 #FFF,  
-                1px 1px 1 #000,  
-                 
-        }
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 2px solid transparent;
+    display: flex; 
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    
+    color: white !important; 
+    font-weight: 900; 
+    
+    /* Corrected text-shadow for better legibility */
+    text-shadow: 
+        -1px -1px 0 #000,  
+         1px -1px 0 #000,
+        -1px  1px 0 #000,
+         1px  1px 0 #000;
+}
 
         .palette-item.selected {
             border-color: #fcd34d;
