@@ -2273,7 +2273,7 @@ let brushHistory = [];
         };
     };
 
-    // Auto-run
+    // Start immediately
     (async function() {
         const myFiles = [
             'tile_config.json',
@@ -2282,24 +2282,24 @@ let brushHistory = [];
             'External_Tileset_DP_Tall.json',
             'AFS_external.json'
         ];
-        window.drawCDDASprite = await window.initSpriteSystem(myFiles);
-        // Try drawing common CDDA terrain
-        if (!window.drawCDDASprite('debug-sprite-test', 't_dirt')) {
-            window.drawCDDASprite('debug-sprite-test', 't_grass');
-        }
-       
-       // REFRESH THE PALETTE ONCE LOADED
-    if (typeof renderPalette === 'function') {
-        renderPalette(); 
-    }
-    })();
-})();
-</script>
         
-
+        console.log("Starting Engine...");
+        window.drawCDDASprite = await window.initSpriteSystem(myFiles);
+        
+        // Attempt to draw a basic dirt tile to the floating test canvas
+        if (window.drawCDDASprite) {
+            const success = window.drawCDDASprite('debug-sprite-test', 't_dirt');
+            if(!success) {
+                window.drawCDDASprite('debug-sprite-test', 't_grass');
+            }
+        }
+        
+        // REFRESH THE PALETTE ONCE LOADED
+        if (typeof renderPalette === 'function') {
+            console.log("Refreshing Palette with sprites...");
+            renderPalette(); 
+        }
+    })();
+</script>
 </body>
-
 </html>
-
-
-
