@@ -164,23 +164,6 @@
         padding-bottom: 10px;
         }
 
-        
-    /* SIZING FIX: Use min-width/height so they don't shrink */
-    min-width: 64px; 
-    min-height: 64px; 
-    margin: 0 auto;
-    overflow: hidden; /* Prevents text overlap outside the brush */
-    
-    
-    /* --- CLEAN OUTLINE METHOD --- */
-            color: white !important;
-            font-weight: 800; /* Heavy weight helps the stroke look better */
-            
-            /* This creates a 1.5px solid black line around every letter */
-            -webkit-text-stroke: 1.5px black;
-            /* For older browsers as a fallback */
-            paint-order: stroke fill;
-}
 
         #floating-palette.collapsed {
             width: 50px;
@@ -817,7 +800,19 @@ let brushHistory = [];
             
             // Generate a unique ID for the canvas so we can target it
             const canvasId = `sprite-canvas-${symbol.replace(/[^a-zA-Z0-9]/g, '_')}`;
-            
+           
+           if (window.drawCDDASprite) {
+    window.drawCDDASprite(canvasId, def.definition);
+} else {
+    // Fallback if engine isn't ready yet
+    const canvas = document.getElementById(canvasId);
+    if(canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = def.color;
+        ctx.fillRect(0,0,64,64);
+    }
+}
+
             item.id = `palette-${symbol.replace(/[^a-zA-Z0-9]/g, '_')}`; 
             item.className = 'palette-item rounded-md text-sm font-bold shadow-md select-none flex flex-col items-center justify-center p-1'; 
             item.dataset.tileKey = symbol;
@@ -2206,72 +2201,59 @@ window.initSpriteSystem = async function(jsonPaths) {
                             });
                         });
                     });
-                });
+                // ... (End of your existing chunk processing loop)
+                        });
+                    }
+                } catch (e) { console.error("Load fail:", path); }
             }
-        } catch (e) { console.error("Load fail:", path); }
-    }
 
-    return function(canvasId, spriteId) {
-        const data = idMap.get(spriteId);
-        const canvas = document.getElementById(canvasId);
-        if (!data || !canvas) return false;
-        
-        const img = imageMap.get(data.file);
-        if (!img || !img.complete) return false;
+            // Return the actual drawing function
+            return function(canvasId, spriteId) {
+                const data = idMap.get(spriteId);
+                const canvas = document.getElementById(canvasId);
+                if (!data || !canvas) return false;
+                
+                const img = imageMap.get(data.file);
+                if (!img || !img.complete) return false;
 
-        // Set the horizontal count if not set
-        if (data.nx === 0) data.nx = Math.floor(img.width / data.w);
+                if (data.nx === 0) data.nx = Math.floor(img.width / data.w);
 
-        const ctx = canvas.getContext('2d');
-        canvas.width = data.w * pixelscale;
-        canvas.height = data.h * pixelscale;
-        ctx.imageSmoothingEnabled = false;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const ctx = canvas.getContext('2d');
+                canvas.width = data.w * pixelscale;
+                canvas.height = data.h * pixelscale;
+                ctx.imageSmoothingEnabled = false;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        const drawLayer = (layer) => {
-            if (!layer && layer !== 0) return;
-            const sId = (typeof layer === 'object') ? layer.sprite : layer;
-            // Skip random sprite arrays for now
-            if (Array.isArray(sId)) return; 
+                const drawLayer = (layer) => {
+                    if (!layer && layer !== 0) return;
+                    const sId = (typeof layer === 'object') ? layer.sprite : layer;
+                    if (Array.isArray(sId)) return; 
 
-            ctx.drawImage(
-                img,
-                (sId % data.nx) * data.w, Math.floor(sId / data.nx) * data.h, // Source
-                data.w, data.h,                                              // Source size
-                0, 0,                                                        // Dest
-                data.w * pixelscale, data.h * pixelscale                      // Dest size
-            );
+                    ctx.drawImage(
+                        img,
+                        (sId % data.nx) * data.w, Math.floor(sId / data.nx) * data.h,
+                        data.w, data.h,
+                        0, 0,
+                        data.w * pixelscale, data.h * pixelscale
+                    );
+                };
+
+                drawLayer(data.bg);
+                drawLayer(data.fg);
+                return true;
+            };
         };
 
-        drawLayer(data.bg);
-        drawLayer(data.fg);
-        return true;
-    };
-};
-
-// 2. Start the Engine immediately
-(async function() {
-    try {
-        const statusEl = document.getElementById('sprite-status');
-        if(statusEl) statusEl.innerText = "Connecting to tile_config...";
-
-        window.drawCDDASprite = await window.initSpriteSystem(['tile_config.json']);
-        
-        if (window.drawCDDASprite) {
-            console.log("Sprite Engine Ready");
-            // Draw test sprite
-            window.drawCDDASprite('debug-sprite-test', 't_dirt');
-        }
-        
-        // Refresh palette to show icons
-        if (typeof renderPalette === 'function') {
-            renderPalette(); 
-        }
-    } catch (e) {
-        console.error("Engine start failed:", e);
-    }
-})();
-
-</script>
+        // Start the Engine immediately
+        (async function() {
+            try {
+                window.drawCDDASprite = await window.initSpriteSystem(['tile_config.json']);
+                console.log("Sprite Engine Ready");
+                if (typeof renderPalette === 'function') renderPalette();
+            } catch (e) {
+                console.error("Engine start failed:", e);
+            }
+        })();
+    </script>
 </body>
 </html>
